@@ -207,8 +207,8 @@ class SysMonApp:
         card.pack(fill=tk.X, pady=4)
         inner = tk.Frame(card, bg='#252525')
         inner.pack(fill=tk.BOTH)
-        tk.Label(inner, text=title, font=('Segoe UI', 9), bg='#252525', fg='#888888', anchor=tk.W, padx=14, pady=(10, 0)).pack(fill=tk.X)
-        label = tk.Label(inner, text=default_text, font=('Segoe UI', 14, 'bold'), bg='#252525', fg='#e0e0e0', anchor=tk.W, padx=14, pady=(0, 10))
+        tk.Label(inner, text=title, font=('Segoe UI', 9), bg='#252525', fg='#888888', anchor=tk.W, padx=14, pady=10).pack(fill=tk.X)
+        label = tk.Label(inner, text=default_text, font=('Segoe UI', 14, 'bold'), bg='#252525', fg='#e0e0e0', anchor=tk.W, padx=14, pady=10)
         label.pack(fill=tk.X)
         return label
 
@@ -233,19 +233,19 @@ class SysMonApp:
         card.pack(fill=tk.BOTH, expand=True)
         inner = tk.Frame(card, bg='#252525')
         inner.pack(fill=tk.BOTH, expand=True, padx=24, pady=20)
-        tk.Label(inner, text='Disk /', font=('Segoe UI', 14, 'bold'), bg='#252525', fg='#e0e0e0').pack(pady=(0, 16))
+        tk.Label(inner, text='Disk /', font=('Segoe UI', 14, 'bold'), bg='#252525', fg='#e0e0e0').pack(pady=16)
         self.disk_total_label = self.create_info_row(inner, 'Total', '-- GB')
         self.disk_used_label = self.create_info_row(inner, 'Used', '-- GB')
         self.disk_free_label = self.create_info_row(inner, 'Free', '-- GB')
         self.disk_bar = tk.Canvas(inner, height=8, bg='#1a1a1a', highlightthickness=0)
-        self.disk_bar.pack(fill=tk.X, pady=(16, 0))
+        self.disk_bar.pack(fill=tk.X, pady=16)
 
     def create_info_row(self, parent, title, default_text):
         frame = tk.Frame(parent, bg='#252525')
         frame.pack(fill=tk.X, pady=3)
         tk.Label(frame, text=title, font=('Segoe UI', 10), bg='#252525', fg='#888888', width=8, anchor=tk.W).pack(side=tk.LEFT)
         label = tk.Label(frame, text=default_text, font=('Segoe UI', 12, 'bold'), bg='#252525', fg='#e0e0e0')
-        label.pack(side=tk.LEFT, padx=(10, 0))
+        label.pack(side=tk.LEFT, padx=10)
         return label
 
     def update_progress(self, canvas, value, max_width=None):
