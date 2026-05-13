@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """
-Linux System Monitor — SysMon v3.0.
-Полноценный GUI-монитор с вкладками, графиками и кнопками.
+Linux System Monitor - SysMon v3.0
+Мониторинг ресурсов Linux: CPU, RAM, диск, сеть, температура.
 Авторы: Лива, Настя, Максим
 """
 
 import psutil
 import time
-import threading
 from collections import deque
 from datetime import datetime
 from pathlib import Path
@@ -41,7 +40,6 @@ class SystemStats:
     def __init__(self):
         self.cpu_history = deque(maxlen=HISTORY_SIZE)
         self.ram_history = deque(maxlen=HISTORY_SIZE)
-        self.net_history = deque(maxlen=HISTORY_SIZE)
         self.prev_net = psutil.net_io_counters()
         self.prev_time = time.time()
         psutil.cpu_percent(interval=None)
@@ -53,20 +51,17 @@ class SystemStats:
         net = psutil.net_io_counters()
         now = time.time()
 
-        # Скорость сети
         elapsed = now - self.prev_time
         download_speed = (net.bytes_recv - self.prev_net.bytes_recv) / elapsed
         upload_speed = (net.bytes_sent - self.prev_net.bytes_sent) / elapsed
         self.prev_net = net
         self.prev_time = now
 
-        # Температура
         temp = None
         temps = psutil.sensors_temperatures()
         if 'coretemp' in temps:
             temp = temps['coretemp'][0].current
 
-        # История
         self.cpu_history.append(cpu)
         self.ram_history.append(ram.percent)
 
@@ -87,11 +82,11 @@ class SystemStats:
 # --------------------------- Цвета ---------------------------
 def get_color(value):
     if value < THRESHOLDS['low']:
-        return '#00cc66'
+        return '#4CAF50'
     elif value < THRESHOLDS['medium']:
-        return '#ffaa00'
+        return '#FF9800'
     else:
-        return '#ff3333'
+        return '#F44336'
 
 def format_speed(bytes_per_sec):
     if bytes_per_sec < 1024:
@@ -101,10 +96,10 @@ def format_speed(bytes_per_sec):
     else:
         return f'{bytes_per_sec/(1024**2):.1f} MB/s'
 
-# --------------------------- График на Canvas ---------------------------
+# --------------------------- График ---------------------------
 class MiniGraph(tk.Canvas):
-    def __init__(self, parent, width=300, height=60, color='#00cc66'):
-        super().__init__(parent, width=width, height=height, bg='#1e1e1e', highlightthickness=0)
+    def __init__(self, parent, width=300, height=60, color='#4CAF50'):
+        super().__init__(parent, width=width, height=height, bg='#1a1a1a', highlightthickness=0)
         self.width = width
         self.height = height
         self.color = color
@@ -118,16 +113,13 @@ class MiniGraph(tk.Canvas):
         self.delete('all')
         if len(self.data) < 2:
             return
-
         max_val = max(self.data) if max(self.data) > 0 else 1
         step_x = self.width / (len(self.data) - 1)
-
         points = []
         for i, val in enumerate(self.data):
             x = i * step_x
             y = self.height - (val / max_val) * (self.height - 10) - 5
             points.extend([x, y])
-
         self.create_line(points, fill=self.color, width=2, smooth=True)
 
 # --------------------------- Главное окно ---------------------------
@@ -135,318 +127,375 @@ class SysMonApp:
     def __init__(self, root):
         self.root = root
         self.root.title('Linux System Monitor')
-        self.root.geometry('750x550')
-        self.root.configure(bg='#2b2b2b')
-        self.root.resizable(True, True)
+        self.root.geometry('780x560')
+        self.root.configure(bg='#1e1e1e')
+        self.root.minsize(700, 500)
         self.stats = SystemStats()
         self.running = True
 
+        self.setup_style()
         self.setup_ui()
         self.update_loop()
 
+    def setup_style(self):
+        style = ttk.Style()
+        style.theme_use('clam')
+        style.configure('TButton',
+            background='#333333',
+            foreground='#ffffff',
+            borderwidth=1,
+            focuscolor='none',
+            font=('Segoe UI', 9)
+        )
+        style.map('TButton',
+            background=[('active', '#444444')]
+        )
+        style.configure('TNotebook',
+            background='#1e1e1e',
+            borderwidth=0
+        )
+        style.configure('TNotebook.Tab',
+            background='#2a2a2a',
+            foreground='#aaaaaa',
+            padding=[15, 8],
+            font=('Segoe UI', 10)
+        )
+        style.map('TNotebook.Tab',
+            background=[('selected', '#333333')],
+            foreground=[('selected', '#ffffff')]
+        )
+
     def setup_ui(self):
         # Заголовок
-        title_frame = tk.Frame(self.root, bg='#1a1a1a', height=50)
-        title_frame.pack(fill=tk.X)
-        title_frame.pack_propagate(False)
+        header = tk.Frame(self.root, bg='#141414', height=48)
+        header.pack(fill=tk.X)
+        header.pack_propagate(False)
 
-        title = tk.Label(
-            title_frame,
-            text='🖥️  LINUX SYSTEM MONITOR',
-            font=('Segoe UI', 16, 'bold'),
-            bg='#1a1a1a',
-            fg='#ffffff'
-        )
-        title.pack(pady=10)
+        tk.Label(
+            header,
+            text='LINUX SYSTEM MONITOR',
+            font=('Segoe UI', 15, 'bold'),
+            bg='#141414',
+            fg='#e0e0e0'
+        ).pack(pady=11)
 
-        # Блок кнопок
-        btn_frame = tk.Frame(self.root, bg='#2b2b2b')
-        btn_frame.pack(fill=tk.X, padx=10, pady=5)
+        # Панель управления
+        toolbar = tk.Frame(self.root, bg='#252525')
+        toolbar.pack(fill=tk.X, padx=12, pady=(8, 0))
 
-        ttk.Button(btn_frame, text='🔄 Обновить', command=self.manual_refresh).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text='📋 Логи', command=self.show_logs).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text='ℹ️ О программе', command=self.show_about).pack(side=tk.LEFT, padx=5)
+        ttk.Button(toolbar, text='Refresh', command=self.manual_refresh).pack(side=tk.LEFT, padx=3)
+        ttk.Button(toolbar, text='Logs', command=self.show_logs).pack(side=tk.LEFT, padx=3)
+        ttk.Button(toolbar, text='About', command=self.show_about).pack(side=tk.LEFT, padx=3)
+
+        separator = ttk.Separator(toolbar, orient=tk.VERTICAL)
+        separator.pack(side=tk.LEFT, padx=15, fill=tk.Y, pady=4)
 
         self.auto_refresh_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(
-            btn_frame,
-            text='Автообновление',
-            variable=self.auto_refresh_var
-        ).pack(side=tk.LEFT, padx=20)
+        cb = ttk.Checkbutton(
+            toolbar,
+            text='Auto-refresh',
+            variable=self.auto_refresh_var,
+            command=self.on_auto_refresh_toggle
+        )
+        cb.pack(side=tk.LEFT, padx=3)
 
-        ttk.Label(btn_frame, text=f'Интервал: {INTERVAL}с').pack(side=tk.RIGHT, padx=10)
+        self.interval_label = tk.Label(
+            toolbar,
+            text=f'Interval: {INTERVAL}s',
+            bg='#252525',
+            fg='#888888',
+            font=('Segoe UI', 9)
+        )
+        self.interval_label.pack(side=tk.RIGHT, padx=10)
 
         # Вкладки
         notebook = ttk.Notebook(self.root)
-        notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        notebook.pack(fill=tk.BOTH, expand=True, padx=12, pady=10)
 
-        # Вкладка 1: Обзор
-        overview_frame = tk.Frame(notebook, bg='#2b2b2b')
-        notebook.add(overview_frame, text='📊 Обзор')
-        self.setup_overview_tab(overview_frame)
+        tab_overview = tk.Frame(notebook, bg='#1e1e1e')
+        notebook.add(tab_overview, text='Overview')
+        self.setup_overview_tab(tab_overview)
 
-        # Вкладка 2: Графики
-        graphs_frame = tk.Frame(notebook, bg='#2b2b2b')
-        notebook.add(graphs_frame, text='📈 Графики')
-        self.setup_graphs_tab(graphs_frame)
+        tab_graphs = tk.Frame(notebook, bg='#1e1e1e')
+        notebook.add(tab_graphs, text='History')
+        self.setup_graphs_tab(tab_graphs)
 
-        # Вкладка 3: Диск
-        disk_frame = tk.Frame(notebook, bg='#2b2b2b')
-        notebook.add(disk_frame, text='💾 Диск')
-        self.setup_disk_tab(disk_frame)
+        tab_disk = tk.Frame(notebook, bg='#1e1e1e')
+        notebook.add(tab_disk, text='Disk')
+        self.setup_disk_tab(tab_disk)
 
         # Строка состояния
         self.status_bar = tk.Label(
             self.root,
-            text='Готов',
-            bg='#1a1a1a',
-            fg='#888888',
+            text='Ready',
+            bg='#141414',
+            fg='#777777',
             anchor=tk.W,
-            padx=10
+            padx=12,
+            pady=4,
+            font=('Segoe UI', 8)
         )
         self.status_bar.pack(fill=tk.X, side=tk.BOTTOM)
 
     def setup_overview_tab(self, parent):
-        # Левая колонка
-        left = tk.Frame(parent, bg='#2b2b2b')
-        left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+        left = tk.Frame(parent, bg='#1e1e1e')
+        left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 6))
 
-        self.cpu_bar = self.create_progress_block(left, 'Процессор (CPU)', 'cpu')
-        self.ram_bar = self.create_progress_block(left, 'Память (RAM)', 'ram')
-        self.temp_label = self.create_info_label(left, 'Температура: -- °C')
+        right = tk.Frame(parent, bg='#1e1e1e')
+        right.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(6, 0))
+
+        # Левая колонка
+        self.cpu_frame = self.create_metric_card(left, 'CPU', 'cpu')
+        self.ram_frame = self.create_metric_card(left, 'RAM', 'ram')
+        self.temp_card = self.create_info_card(left, 'Temperature', '-- C')
 
         # Правая колонка
-        right = tk.Frame(parent, bg='#2b2b2b')
-        right.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+        self.disk_frame = self.create_metric_card(right, 'Disk /', 'disk')
+        self.download_card = self.create_info_card(right, 'Download', '--')
+        self.upload_card = self.create_info_card(right, 'Upload', '--')
+        self.proc_card = self.create_info_card(right, 'Processes', '--')
 
-        self.disk_bar = self.create_progress_block(right, 'Диск (/)', 'disk')
-        self.download_label = self.create_info_label(right, 'Загрузка: --')
-        self.upload_label = self.create_info_label(right, 'Отправка: --')
-        self.proc_label = self.create_info_label(right, 'Процессов: --')
+    def create_metric_card(self, parent, title, tag):
+        card = tk.Frame(parent, bg='#2a2a2a', relief=tk.FLAT, bd=0, padx=1, pady=1)
+        card.pack(fill=tk.X, pady=4)
 
-    def create_progress_block(self, parent, title, tag):
-        frame = tk.Frame(parent, bg='#333333', relief=tk.RIDGE, bd=1)
-        frame.pack(fill=tk.X, pady=5)
+        inner = tk.Frame(card, bg='#252525')
+        inner.pack(fill=tk.BOTH)
 
-        header = tk.Frame(frame, bg='#333333')
-        header.pack(fill=tk.X, padx=10, pady=(10, 0))
+        header = tk.Frame(inner, bg='#252525')
+        header.pack(fill=tk.X, padx=14, pady=(12, 4))
 
         tk.Label(
             header, text=title,
-            font=('Segoe UI', 12, 'bold'),
-            bg='#333333', fg='#ffffff'
+            font=('Segoe UI', 11, 'bold'),
+            bg='#252525', fg='#cccccc'
         ).pack(side=tk.LEFT)
 
         value_label = tk.Label(
             header, text='0%',
-            font=('Segoe UI', 12, 'bold'),
-            bg='#333333', fg='#00cc66'
+            font=('Segoe UI', 13, 'bold'),
+            bg='#252525', fg='#4CAF50'
         )
         value_label.pack(side=tk.RIGHT)
 
-        canvas = tk.Canvas(frame, height=25, bg='#1e1e1e', highlightthickness=0)
-        canvas.pack(fill=tk.X, padx=10, pady=(5, 10))
+        canvas = tk.Canvas(inner, height=6, bg='#1a1a1a', highlightthickness=0)
+        canvas.pack(fill=tk.X, padx=14, pady=(0, 12))
 
         setattr(self, f'{tag}_canvas', canvas)
         setattr(self, f'{tag}_value_label', value_label)
+        return card
 
-        return frame
+    def create_info_card(self, parent, title, default_text):
+        card = tk.Frame(parent, bg='#2a2a2a', relief=tk.FLAT, bd=0, padx=1, pady=1)
+        card.pack(fill=tk.X, pady=4)
 
-    def create_info_label(self, parent, text):
+        inner = tk.Frame(card, bg='#252525')
+        inner.pack(fill=tk.BOTH)
+
+        tk.Label(
+            inner, text=title,
+            font=('Segoe UI', 9),
+            bg='#252525', fg='#888888',
+            anchor=tk.W, padx=14, pady=(10, 0)
+        ).pack(fill=tk.X)
+
         label = tk.Label(
-            parent,
-            text=text,
-            font=('Segoe UI', 11),
-            bg='#333333',
-            fg='#ffffff',
-            anchor=tk.W,
-            padx=15,
-            pady=10,
-            relief=tk.RIDGE,
-            bd=1
+            inner, text=default_text,
+            font=('Segoe UI', 14, 'bold'),
+            bg='#252525', fg='#e0e0e0',
+            anchor=tk.W, padx=14, pady=(0, 10)
         )
-        label.pack(fill=tk.X, pady=5)
+        label.pack(fill=tk.X)
         return label
 
     def setup_graphs_tab(self, parent):
-        parent.configure(bg='#2b2b2b')
+        container = tk.Frame(parent, bg='#1e1e1e')
+        container.pack(fill=tk.BOTH, expand=True, padx=6, pady=6)
 
-        frame = tk.Frame(parent, bg='#2b2b2b')
-        frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        card = tk.Frame(container, bg='#2a2a2a', relief=tk.FLAT, bd=0, padx=1, pady=1)
+        card.pack(fill=tk.BOTH, expand=True, pady=4)
 
-        tk.Label(
-            frame, text='Загрузка CPU (история)',
-            font=('Segoe UI', 11, 'bold'),
-            bg='#2b2b2b', fg='#ffffff'
-        ).pack(anchor=tk.W)
-
-        self.cpu_graph = MiniGraph(frame, width=680, height=80, color='#00cc66')
-        self.cpu_graph.pack(fill=tk.X, pady=(5, 20))
+        inner = tk.Frame(card, bg='#252525')
+        inner.pack(fill=tk.BOTH, expand=True, padx=16, pady=16)
 
         tk.Label(
-            frame, text='Использование RAM (история)',
-            font=('Segoe UI', 11, 'bold'),
-            bg='#2b2b2b', fg='#ffffff'
+            inner, text='CPU History',
+            font=('Segoe UI', 10, 'bold'),
+            bg='#252525', fg='#cccccc'
         ).pack(anchor=tk.W)
 
-        self.ram_graph = MiniGraph(frame, width=680, height=80, color='#ffaa00')
-        self.ram_graph.pack(fill=tk.X, pady=5)
+        self.cpu_graph = MiniGraph(inner, width=700, height=80, color='#4CAF50')
+        self.cpu_graph.pack(fill=tk.X, pady=(4, 16))
+
+        tk.Label(
+            inner, text='RAM History',
+            font=('Segoe UI', 10, 'bold'),
+            bg='#252525', fg='#cccccc'
+        ).pack(anchor=tk.W)
+
+        self.ram_graph = MiniGraph(inner, width=700, height=80, color='#FF9800')
+        self.ram_graph.pack(fill=tk.X, pady=4)
 
     def setup_disk_tab(self, parent):
-        parent.configure(bg='#2b2b2b')
+        container = tk.Frame(parent, bg='#1e1e1e')
+        container.pack(fill=tk.BOTH, expand=True, padx=6, pady=6)
 
-        frame = tk.Frame(parent, bg='#2b2b2b')
-        frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        card = tk.Frame(container, bg='#2a2a2a', relief=tk.FLAT, bd=0, padx=1, pady=1)
+        card.pack(fill=tk.BOTH, expand=True)
+
+        inner = tk.Frame(card, bg='#252525')
+        inner.pack(fill=tk.BOTH, expand=True, padx=24, pady=20)
 
         tk.Label(
-            frame, text='💾 Информация о диске /',
+            inner, text='Disk /',
             font=('Segoe UI', 14, 'bold'),
-            bg='#2b2b2b', fg='#ffffff'
-        ).pack(pady=(0, 20))
+            bg='#252525', fg='#e0e0e0'
+        ).pack(pady=(0, 16))
 
-        self.disk_total_label = tk.Label(
-            frame, text='Всего: -- GB',
-            font=('Segoe UI', 12),
-            bg='#333333', fg='#ffffff',
-            relief=tk.RIDGE, bd=1,
-            padx=20, pady=10
+        self.disk_total_label = self.create_info_row(inner, 'Total', '-- GB')
+        self.disk_used_label = self.create_info_row(inner, 'Used', '-- GB')
+        self.disk_free_label = self.create_info_row(inner, 'Free', '-- GB')
+
+        self.disk_bar = tk.Canvas(inner, height=8, bg='#1a1a1a', highlightthickness=0)
+        self.disk_bar.pack(fill=tk.X, pady=(16, 0))
+
+    def create_info_row(self, parent, title, default_text):
+        frame = tk.Frame(parent, bg='#252525')
+        frame.pack(fill=tk.X, pady=3)
+
+        tk.Label(
+            frame, text=title,
+            font=('Segoe UI', 10),
+            bg='#252525', fg='#888888',
+            width=8, anchor=tk.W
+        ).pack(side=tk.LEFT)
+
+        label = tk.Label(
+            frame, text=default_text,
+            font=('Segoe UI', 12, 'bold'),
+            bg='#252525', fg='#e0e0e0'
         )
-        self.disk_total_label.pack(fill=tk.X, pady=5)
-
-        self.disk_used_label = tk.Label(
-            frame, text='Занято: -- GB',
-            font=('Segoe UI', 12),
-            bg='#333333', fg='#ffffff',
-            relief=tk.RIDGE, bd=1,
-            padx=20, pady=10
-        )
-        self.disk_used_label.pack(fill=tk.X, pady=5)
-
-        self.disk_free_label = tk.Label(
-            frame, text='Свободно: -- GB',
-            font=('Segoe UI', 12),
-            bg='#333333', fg='#ffffff',
-            relief=tk.RIDGE, bd=1,
-            padx=20, pady=10
-        )
-        self.disk_free_label.pack(fill=tk.X, pady=5)
-
-        self.disk_canvas = tk.Canvas(frame, height=30, bg='#1e1e1e', highlightthickness=0)
-        self.disk_canvas.pack(fill=tk.X, pady=(20, 0))
+        label.pack(side=tk.LEFT, padx=(10, 0))
+        return label
 
     def update_progress(self, canvas, value, max_width=None):
         canvas.delete('all')
         if max_width is None:
             max_width = canvas.winfo_width()
-        if max_width < 10:
+        if max_width < 4:
             max_width = 300
         fill_width = int((value / 100) * max_width)
         color = get_color(value)
-        canvas.create_rectangle(0, 0, fill_width, 25, fill=color, outline='')
-        canvas.create_text(
-            max_width / 2, 12,
-            text=f'{value:.1f}%',
-            fill='#ffffff',
-            font=('Segoe UI', 10, 'bold')
-        )
+        canvas.create_rectangle(0, 0, fill_width, 6, fill=color, outline='', tags='bar')
 
     def manual_refresh(self):
         data = self.stats.get_all()
         self.update_display(data)
-        self.status_bar.config(text=f'Обновлено вручную | {datetime.now().strftime("%H:%M:%S")}')
+        self.status_bar.config(text=f'Manual refresh | {datetime.now().strftime("%H:%M:%S")}')
+
+    def on_auto_refresh_toggle(self):
+        if self.auto_refresh_var.get():
+            self.status_bar.config(text='Auto-refresh resumed')
+            self.update_loop()
 
     def update_display(self, data):
         # CPU
-        max_w = self.cpu_bar.winfo_width() if hasattr(self, 'cpu_bar') else 300
-        self.update_progress(self.cpu_canvas, data['cpu'], max_w - 20)
+        self.update_progress(self.cpu_canvas, data['cpu'])
         self.cpu_value_label.config(
             text=f'{data["cpu"]:.1f}%',
             fg=get_color(data['cpu'])
         )
 
         # RAM
-        max_w = self.ram_bar.winfo_width() if hasattr(self, 'ram_bar') else 300
-        self.update_progress(self.ram_canvas, data['ram_percent'], max_w - 20)
+        self.update_progress(self.ram_canvas, data['ram_percent'])
         self.ram_value_label.config(
             text=f'{data["ram_percent"]:.1f}%',
             fg=get_color(data['ram_percent'])
         )
-        self.ram_bar_label_text = f'Занято: {data["ram_used_gb"]} GB / {data["ram_total_gb"]} GB'
-        self.ram_value_label.config(text=f'{data["ram_percent"]:.1f}%')
 
-        # Disk
-        self.update_progress(self.disk_canvas, data['disk_percent'], 680)
+        # Disk overview
+        self.update_progress(self.disk_canvas, data['disk_percent'])
         self.disk_value_label.config(
             text=f'{data["disk_percent"]:.1f}%',
             fg=get_color(data['disk_percent'])
         )
 
         # Disk tab
-        self.disk_total_label.config(text=f'Всего: {data["disk_total_gb"]} GB')
-        self.disk_used_label.config(text=f'Занято: {data["disk_used_gb"]} GB')
+        self.disk_total_label.config(text=f'{data["disk_total_gb"]} GB')
+        self.disk_used_label.config(text=f'{data["disk_used_gb"]} GB')
         disk_free = data['disk_total_gb'] - data['disk_used_gb']
-        self.disk_free_label.config(text=f'Свободно: {disk_free:.1f} GB')
+        self.disk_free_label.config(text=f'{disk_free:.1f} GB')
+
+        disk_w = self.disk_bar.winfo_width()
+        if disk_w > 4:
+            fill_w = int((data['disk_percent'] / 100) * disk_w)
+            self.disk_bar.delete('all')
+            self.disk_bar.create_rectangle(
+                0, 0, fill_w, 8,
+                fill=get_color(data['disk_percent']),
+                outline=''
+            )
 
         # Temperature
-        temp_text = f'Температура: {data["temp"]}°C' if data['temp'] else 'Температура: -- °C'
-        self.temp_label.config(text=temp_text)
+        temp_text = f'{data["temp"]} C' if data['temp'] else '-- C'
+        self.temp_card.config(text=temp_text)
 
         # Network
-        self.download_label.config(text=f'Загрузка: {format_speed(data["download"])}')
-        self.upload_label.config(text=f'Отправка: {format_speed(data["upload"])}')
+        self.download_card.config(text=format_speed(data['download']))
+        self.upload_card.config(text=format_speed(data['upload']))
 
         # Processes
-        self.proc_label.config(text=f'Процессов: {data["processes"]}')
+        self.proc_card.config(text=str(data['processes']))
 
         # Graphs
         self.cpu_graph.add_value(data['cpu'])
         self.ram_graph.add_value(data['ram_percent'])
 
     def update_loop(self):
-        if self.running:
+        if self.running and self.auto_refresh_var.get():
             data = self.stats.get_all()
             self.update_display(data)
             self.status_bar.config(
-                text=f'Обновлено: {datetime.now().strftime("%H:%M:%S")} | '
-                     f'CPU: {data["cpu"]:.0f}% | RAM: {data["ram_percent"]:.0f}%'
+                text=f'Updated: {datetime.now().strftime("%H:%M:%S")} | '
+                     f'CPU {data["cpu"]:.0f}% | RAM {data["ram_percent"]:.0f}%'
             )
-
-            if self.auto_refresh_var.get():
-                self.root.after(int(INTERVAL * 1000), self.update_loop)
-            else:
-                self.status_bar.config(text='Автообновление отключено')
+            self.root.after(int(INTERVAL * 1000), self.update_loop)
 
     def show_logs(self):
         log_window = tk.Toplevel(self.root)
-        log_window.title('Логи системы')
-        log_window.geometry('600x400')
-        log_window.configure(bg='#2b2b2b')
+        log_window.title('System Logs')
+        log_window.geometry('650x420')
+        log_window.configure(bg='#1e1e1e')
+        log_window.minsize(400, 300)
 
         text = scrolledtext.ScrolledText(
             log_window,
-            bg='#1e1e1e',
-            fg='#00ff66',
-            font=('Courier New', 10),
-            insertbackground='#00ff66'
+            bg='#141414',
+            fg='#aaaaaa',
+            font=('Cascadia Code', 10),
+            insertbackground='#aaaaaa',
+            relief=tk.FLAT,
+            borderwidth=0,
+            padx=12,
+            pady=12
         )
-        text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        text.pack(fill=tk.BOTH, expand=True)
 
         log_path = config.get('log_file', 'system_log.txt')
         if Path(log_path).exists():
             text.insert(tk.END, Path(log_path).read_text(encoding='utf-8'))
         else:
-            text.insert(tk.END, 'Лог-файл отсутствует.')
-
+            text.insert(tk.END, 'Log file not found.')
         text.config(state=tk.DISABLED)
 
     def show_about(self):
         messagebox.showinfo(
-            'О программе',
-            'Linux System Monitor v3.0\n\n'
-            'Мониторинг ресурсов Linux в реальном времени.\n'
-            'CPU, RAM, диск, сеть, температура.\n\n'
-            'Авторы: Лива, Настя, Максим\n'
-            '© 2025'
+            'About',
+            'Linux System Monitor\n'
+            'Version 3.0\n\n'
+            'Real-time Linux resource monitoring.\n'
+            'CPU, RAM, Disk, Network, Temperature.\n\n'
+            'Authors: Liva, Nastya, Maxim\n'
         )
 
     def on_close(self):
