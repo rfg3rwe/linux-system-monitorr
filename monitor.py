@@ -150,6 +150,16 @@ class SysMonApp:
         style.map('TButton',
             background=[('active', '#444444')]
         )
+        style.configure('Exit.TButton',
+            background='#333333',
+            foreground='#F44336',
+            borderwidth=1,
+            focuscolor='none',
+            font=('Segoe UI', 9, 'bold')
+        )
+        style.map('Exit.TButton',
+            background=[('active', '#553333')]
+        )
         style.configure('TNotebook',
             background='#1e1e1e',
             borderwidth=0
@@ -207,6 +217,13 @@ class SysMonApp:
             font=('Segoe UI', 9)
         )
         self.interval_label.pack(side=tk.RIGHT, padx=10)
+
+        ttk.Button(
+            toolbar,
+            text='Exit',
+            command=self.on_close,
+            style='Exit.TButton'
+        ).pack(side=tk.RIGHT, padx=3)
 
         # Вкладки
         notebook = ttk.Notebook(self.root)
