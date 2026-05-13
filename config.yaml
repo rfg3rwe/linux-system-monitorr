@@ -1,0 +1,8 @@
+thresholds:
+  low: 50
+  medium: 80
+
+interval: 1.0
+history_size: 20
+log_file: system_log.txt
+log_max_entries: 1000

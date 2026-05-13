@@ -1,0 +1,14 @@
+[Unit]
+Description=Linux System Monitor (SysMon) daemon
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/linux-system-monitor
+ExecStart=/usr/bin/python3 /opt/linux-system-monitor/monitor.py --mode daemon --config /opt/linux-system-monitor/config.yaml
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
