@@ -30,8 +30,8 @@
 ## 🛠 Установка и запуск
 
 ```bash
-git clone https://github.com/rfg3rwe/linux-system-monitor.git
-cd linux-system-monitor
+git clone https://github.com/rfg3rwe/linux-system-monitorr.git
+cd linux-system-monitorr
 sudo apt update
 sudo apt install python3-pip python3-tk
 pip install -r requirements.txt
